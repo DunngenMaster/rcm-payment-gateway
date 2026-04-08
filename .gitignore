@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pyd
+*.pyo
+*.python-version
+venv/
+.env
+.env.*
+.pytest_cache/
+coverage/
+htmlcov/
+dist/
+build/
+
+# Node / frontend
+node_modules/
+.npm/
+yarn-error.log
+yarn-debug.log*
+pnpm-debug.log*
+pnpm-debug.log.*
+package-lock.json
+npm-debug.log*
+
+# Vite / frontend build
+dist/
+.vite/
+
+# VS Code
+.vscode/
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+
+# Local env files
+*.local
+*.env.local
+*.env.*.local
+
+# Python bytecode
+*.pyc
+*.pyo
+*.pyd
+
+# MyPy
+.mypy_cache/
+
+# Pyre
+.pyre/
