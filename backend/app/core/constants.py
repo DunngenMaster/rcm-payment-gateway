@@ -26,7 +26,7 @@ HEALTH_ROUTE_PATH = "/health"
 AUTH_ROUTER_PREFIX = "/auth"
 AUTH_ROUTER_TAG = "auth"
 AUTH_START_ROUTE = "/start"
-AUTH_CALLBACK_ROUTE = "/callback"
+AUTH_EXCHANGE_ROUTE = "/exchange"
 
 # ============================================================================
 # Response Keys and Values
@@ -70,9 +70,8 @@ TOKEN_JSON_KEY_ACCESS_TOKEN = "access_token"
 FILE_MODE_READ = "r"
 FILE_MODE_WRITE = "w"
 
-# ============================================================================
+
 # Error Messages
-# ============================================================================
 ERROR_NO_ACCESS_TOKEN = "Access token not found. Please authenticate with Clover first."
 
 
