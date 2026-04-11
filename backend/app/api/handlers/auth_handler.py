@@ -1,5 +1,7 @@
 from app.models import CodeExchangeRequest
 from app.services.clover_oauth_service import clover_oauth_service
+from app.clients.clover_client import clover_client
+from app.db.token_store import token_store
 from app.core.constants import (
     RESPONSE_KEY_SUCCESS,
     RESPONSE_KEY_MESSAGE,
@@ -23,3 +25,26 @@ class AuthHandler:
             RESPONSE_KEY_MESSAGE: MSG_AUTH_CONNECTED,
             RESPONSE_KEY_TOKEN_DATA: token_data
         }
+
+    async def check_connection(self) -> dict:
+        access_token = token_store.get_access_token()
+        merchant_id = token_store.get_merchant_id()
+
+        if not access_token or not merchant_id:
+            return {
+                "connected": False,
+                "message": "Clover not connected"
+            }
+
+        try:
+            endpoint = f"/v3/merchants/{merchant_id}"
+            await clover_client.get(endpoint)
+            return {
+                "connected": True,
+                "message": "Clover connected"
+            }
+        except Exception:
+            return {
+                "connected": False,
+                "message": "Clover session expired"
+            }
