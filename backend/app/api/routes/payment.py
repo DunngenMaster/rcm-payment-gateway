@@ -45,6 +45,14 @@ async def add_line_item(payload: AddLineItemRequest):
         raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+@router.delete(PAYMENT_ROUTE_LINE_ITEM)
+async def delete_line_item(order_id: str, line_item_id: str):
+    try:
+        return await payment_handler.delete_line_item(order_id, line_item_id)
+    except Exception as e:
+        raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get(PAYMENT_ROUTE_ECOMMERCE_KEY)
 async def get_ecommerce_key():
     try:

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   API_BASE_URL,
   AUTH_START,
@@ -11,7 +11,6 @@ import {
   METHOD_POST,
   HEADER_CONTENT_TYPE,
   CONTENT_TYPE_JSON,
-  DEFAULT_CARD_NUMBER,
   DEFAULT_EXP_MONTH,
   DEFAULT_EXP_YEAR,
   DEFAULT_CVV,
@@ -37,12 +36,18 @@ import {
   MSG_CARD_TOKENIZE_ERROR,
   MSG_PAYMENT_PROCESSING,
   MSG_PAYMENT_SUCCESSFUL,
-  MSG_PAYMENT_FAILED,
   MSG_PAYMENT_ERROR,
   STORAGE_MERCHANT_ID,
   PARAM_CODE,
   PARAM_MERCHANT_ID,
 } from "./constants";
+import { OrderForm } from "./components/OrderForm";
+import { CardForm } from "./components/CardForm";
+import { PaymentSummary } from "./components/PaymentSummary";
+import { ErrorDialog } from "./components/ErrorDialog";
+import { validateOrderForm, validateCardForm, validateChargeForm } from "./validations";
+import { mapPaymentError } from "./utils/errorMapping";
+import type { ValidationErrors } from "./validations";
 
 interface Order {
   id: string;
@@ -56,6 +61,13 @@ interface LineItem {
   quantity: number;
 }
 
+interface ErrorDialog {
+  show: boolean;
+  title: string;
+  message: string;
+  isDecline: boolean;
+}
+
 function App() {
   const [message, setMessage] = useState<string>(MSG_WELCOME);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -65,13 +77,75 @@ function App() {
   const [itemPrice, setItemPrice] = useState<string>("");
   const [itemQuantity, setItemQuantity] = useState<string>(DEFAULT_QUANTITY);
 
-  const [cardNumber, setCardNumber] = useState<string>(DEFAULT_CARD_NUMBER);
+  const [cardNumber, setCardNumber] = useState<string>("");
   const [expMonth, setExpMonth] = useState<string>(DEFAULT_EXP_MONTH);
   const [expYear, setExpYear] = useState<string>(DEFAULT_EXP_YEAR);
   const [cvv, setCvv] = useState<string>(DEFAULT_CVV);
   const [zip, setZip] = useState<string>(DEFAULT_ZIP);
   const [ecommerceKey, setEcommerceKey] = useState<string | null>(null);
   const [sourceToken, setSourceToken] = useState<string | null>(null);
+
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [errorDialog, setErrorDialog] = useState<ErrorDialog>({ show: false, title: "", message: "", isDecline: false });
+
+  const validateCurrency = (value: string): { valid: boolean; cents?: number; error?: string } => {
+    if (!value || value.trim() === "") {
+      return { valid: false, error: "Price is required" };
+    }
+
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+      return { valid: false, error: "Price must be numeric" };
+    }
+
+    if (num < 0.01) {
+      return { valid: false, error: "Price must be at least 0.01" };
+    }
+
+    const decimalMatch = value.match(/\.(\d+)$/);
+    const decimalPlaces = decimalMatch ? decimalMatch[1].length : 0;
+    if (decimalPlaces > 2) {
+      return { valid: false, error: "Price must have at most 2 decimal places" };
+    }
+
+    const cents = Math.round(num * 100);
+    return { valid: true, cents };
+  };
+
+  const closeErrorDialog = () => {
+    setErrorDialog({ ...errorDialog, show: false });
+  };
+
+  const handleUseAnotherCard = () => {
+    setSourceToken(null);
+    closeErrorDialog();
+    setTimeout(() => {
+      const cardInput = document.querySelector('input[placeholder="Card Number"]') as HTMLInputElement;
+      if (cardInput) {
+        cardInput.focus();
+      }
+    }, 100);
+  };
+
+  const checkCloverConnection = async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/status`);
+      const data = await response.json();
+
+      if (!data.connected) {
+        setMessage("Clover session expired. Redirecting to reconnect...");
+        setTimeout(() => {
+          window.location.href = `${API_BASE_URL}/auth/start`;
+        }, 1500);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      setMessage("Could not verify Clover connection. Please try again.");
+      return false;
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -109,6 +183,9 @@ function App() {
   };
 
   const createOrder = async () => {
+    const isConnected = await checkCloverConnection();
+    if (!isConnected) return;
+
     try {
       const response = await fetch(`${API_BASE_URL}${PAYMENT_ORDER}`, {
         method: METHOD_POST,
@@ -127,7 +204,19 @@ function App() {
   };
 
   const addLineItem = async () => {
-    if (!currentOrder || !itemName || !itemPrice) return;
+    const priceValidation = validateCurrency(itemPrice);
+    if (!priceValidation.valid) {
+      setErrors({ ...errors, itemPrice: priceValidation.error });
+      return;
+    }
+
+    const validationErrors = validateOrderForm(itemName, itemPrice, itemQuantity);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    if (!currentOrder) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}${PAYMENT_LINE_ITEM}`, {
@@ -135,8 +224,8 @@ function App() {
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
         body: JSON.stringify({
           order_id: currentOrder.id,
-          name: itemName,
-          price: Math.round(parseFloat(itemPrice) * 100),
+          name: itemName.trim(),
+          price: priceValidation.cents,
           quantity: parseInt(itemQuantity)
         })
       });
@@ -145,12 +234,13 @@ function App() {
         setLineItems([...lineItems, {
           id: data.line_item.id,
           name: itemName,
-          price: Math.round(parseFloat(itemPrice) * 100),
+          price: priceValidation.cents!,
           quantity: parseInt(itemQuantity)
         }]);
         setItemName("");
         setItemPrice("");
         setItemQuantity(DEFAULT_QUANTITY);
+        setErrors({});
         setMessage(MSG_ITEM_ADDED);
       }
     } catch (error) {
@@ -158,7 +248,28 @@ function App() {
     }
   };
 
+  const removeLineItem = async (lineItemId: string) => {
+    if (!currentOrder) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${PAYMENT_LINE_ITEM}?order_id=${currentOrder.id}&line_item_id=${lineItemId}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (data.success) {
+        setLineItems(lineItems.filter(item => item.id !== lineItemId));
+        setMessage("Item removed from order");
+      }
+    } catch (error) {
+      setMessage("Failed to remove item");
+    }
+  };
+
   const getEcommerceKey = async () => {
+    const isConnected = await checkCloverConnection();
+    if (!isConnected) return;
+
     try {
       setMessage(MSG_ECOMMERCE_KEY_FETCH);
       const response = await fetch(`${API_BASE_URL}${PAYMENT_ECOMMERCE_KEY}`);
@@ -173,6 +284,21 @@ function App() {
   };
 
   const tokenizeCard = async () => {
+    const isConnected = await checkCloverConnection();
+    if (!isConnected) return;
+
+    // Check for existing real-time validation errors
+    const hasErrors = Object.values(errors).some(error => error);
+    if (hasErrors) {
+      return;
+    }
+
+    const validationErrors = validateCardForm(cardNumber, expMonth, expYear, cvv, zip);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
     if (!ecommerceKey) {
       setMessage(MSG_ECOMMERCE_KEY_REQUIRED);
       return;
@@ -195,6 +321,7 @@ function App() {
       const data = await response.json();
       if (data.success && data.token_data && data.token_data.id) {
         setSourceToken(data.token_data.id);
+        setErrors({});
         setMessage(`${MSG_CARD_TOKENIZED}${data.token_data.id}`);
       } else {
         setMessage(`${MSG_CARD_TOKENIZE_FAILED}${JSON.stringify(data)}`);
@@ -205,9 +332,23 @@ function App() {
   };
 
   const processPayment = async () => {
-    if (!currentOrder || !sourceToken) return;
+    const isConnected = await checkCloverConnection();
+    if (!isConnected) return;
 
     const totalAmount = lineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    if (totalAmount < 1) {
+      setErrors({ ...errors, amount: "Payment amount must be at least 0.01" });
+      return;
+    }
+
+    const validationErrors = validateChargeForm(totalAmount);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    if (!currentOrder || !sourceToken) return;
 
     try {
       setMessage(MSG_PAYMENT_PROCESSING);
@@ -229,12 +370,90 @@ function App() {
         setLineItems([]);
         setSourceToken(null);
         setEcommerceKey(null);
+        setErrors({});
       } else {
-        setMessage(`${MSG_PAYMENT_FAILED}${JSON.stringify(data)}`);
+        const mappedError = mapPaymentError(data);
+        setErrorDialog({
+          show: true,
+          title: mappedError.title,
+          message: mappedError.message,
+          isDecline: mappedError.isDecline
+        });
+        setMessage("");
       }
     } catch (error) {
       setMessage(`${MSG_PAYMENT_ERROR}${String(error)}`);
     }
+  };
+
+  const handleClearError = (field: keyof ValidationErrors) => {
+    setErrors({ ...errors, [field]: undefined });
+  };
+
+  const handleExpMonthChange = (value: string) => {
+    setExpMonth(value);
+    
+    setErrors(prevErrors => {
+      const newErrors = { ...prevErrors };
+      
+      if (value) {
+        const month = parseInt(value);
+        if (isNaN(month) || month < 1 || month > 12) {
+          newErrors.expMonth = "Month must be between 1 and 12";
+        } else {
+          delete newErrors.expMonth;
+        }
+      } else {
+        delete newErrors.expMonth;
+      }
+      
+      return newErrors;
+    });
+  };
+
+  const handleExpYearChange = (value: string) => {
+    setExpYear(value);
+    
+    setErrors(prevErrors => {
+      const newErrors = { ...prevErrors };
+      
+      if (value) {
+        const year = parseInt(value);
+        const currentYear = new Date().getFullYear();
+        
+        if (isNaN(year) || year < currentYear || year > currentYear + 20) {
+          newErrors.expYear = "Expiry year looks invalid. Please enter a realistic future year.";
+        } else {
+          delete newErrors.expYear;
+        }
+      } else {
+        delete newErrors.expYear;
+      }
+      
+      return newErrors;
+    });
+  };
+
+  const handleZipChange = (value: string) => {
+    setZip(value);
+    
+    setErrors(prevErrors => {
+      const newErrors = { ...prevErrors };
+      
+      if (value) {
+        const isValidZip = /^\d+$/.test(value) && (value.length === 5 || value.length === 9);
+        
+        if (!isValidZip) {
+          newErrors.zip = "ZIP code must be 5 or 9 digits.";
+        } else {
+          delete newErrors.zip;
+        }
+      } else {
+        delete newErrors.zip;
+      }
+      
+      return newErrors;
+    });
   };
 
   const totalAmount = lineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -279,146 +498,58 @@ function App() {
             <div>
               <h3>Order: {currentOrder.title}</h3>
 
-              <div style={{ marginBottom: "20px" }}>
-                <h4>Add Item</h4>
-                <input
-                  type="text"
-                  placeholder="Item name"
-                  value={itemName}
-                  onChange={(e) => setItemName(e.target.value)}
-                  style={{ margin: "5px", padding: "5px" }}
-                />
-                <input
-                  type="number"
-                  placeholder="Price ($)"
-                  value={itemPrice}
-                  onChange={(e) => setItemPrice(e.target.value)}
-                  style={{ margin: "5px", padding: "5px" }}
-                />
-                <input
-                  type="number"
-                  placeholder="Quantity"
-                  value={itemQuantity}
-                  onChange={(e) => setItemQuantity(e.target.value)}
-                  min="1"
-                  style={{ margin: "5px", padding: "5px", width: "60px" }}
-                />
-                <button onClick={addLineItem} style={{
-                  padding: "5px 10px",
-                  cursor: "pointer",
-                  backgroundColor: "#FF9800",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px"
-                }}>
-                  Add Item
-                </button>
-              </div>
+              <OrderForm
+                itemName={itemName}
+                itemPrice={itemPrice}
+                itemQuantity={itemQuantity}
+                onItemNameChange={setItemName}
+                onItemPriceChange={setItemPrice}
+                onItemQuantityChange={setItemQuantity}
+                onAddItem={addLineItem}
+                errors={errors}
+                onErrorClear={handleClearError}
+              />
 
-              {lineItems.length > 0 && (
-                <div style={{ marginBottom: "20px" }}>
-                  <h4>Order Items</h4>
-                  {lineItems.map((item, index) => (
-                    <div key={index} style={{ padding: "5px", borderBottom: "1px solid #ccc" }}>
-                      {item.name} - ${(item.price / 100).toFixed(2)} x {item.quantity}
-                    </div>
-                  ))}
-                  <div style={{ fontWeight: "bold", marginTop: "10px" }}>
-                    Total: ${(totalAmount / 100).toFixed(2)}
-                  </div>
-                </div>
-              )}
-
-              {lineItems.length > 0 && !ecommerceKey && (
-                <button onClick={getEcommerceKey} style={{
-                  padding: "10px 20px",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                  backgroundColor: "#9C27B0",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  marginRight: "10px"
-                }}>
-                  Get Ecommerce Key
-                </button>
-              )}
+              <PaymentSummary
+                lineItems={lineItems}
+                totalAmount={totalAmount}
+                ecommerceKey={ecommerceKey}
+                sourceToken={sourceToken}
+                onGetEcommerceKey={getEcommerceKey}
+                onProcessPayment={processPayment}
+                onRemoveLineItem={removeLineItem}
+              />
 
               {ecommerceKey && !sourceToken && (
-                <div style={{ marginBottom: "20px" }}>
-                  <h4>Card Details</h4>
-                  <input
-                    type="text"
-                    placeholder="Card Number"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    style={{ margin: "5px", padding: "8px", width: "100%" }}
-                  />
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <input
-                      type="text"
-                      placeholder="MM"
-                      value={expMonth}
-                      onChange={(e) => setExpMonth(e.target.value)}
-                      maxLength={2}
-                      style={{ padding: "8px", width: "60px" }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="YYYY"
-                      value={expYear}
-                      onChange={(e) => setExpYear(e.target.value)}
-                      maxLength={4}
-                      style={{ padding: "8px", width: "80px" }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="CVV"
-                      value={cvv}
-                      onChange={(e) => setCvv(e.target.value)}
-                      maxLength={4}
-                      style={{ padding: "8px", width: "60px" }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="ZIP"
-                      value={zip}
-                      onChange={(e) => setZip(e.target.value)}
-                      style={{ padding: "8px", width: "80px" }}
-                    />
-                  </div>
-                  <button onClick={tokenizeCard} style={{
-                    padding: "10px 20px",
-                    fontSize: "14px",
-                    cursor: "pointer",
-                    backgroundColor: "#FF5722",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "4px",
-                    marginTop: "10px"
-                  }}>
-                    Tokenize Card
-                  </button>
-                </div>
-              )}
-
-              {sourceToken && (
-                <button onClick={processPayment} style={{
-                  padding: "10px 20px",
-                  fontSize: "16px",
-                  cursor: "pointer",
-                  backgroundColor: "#4CAF50",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px"
-                }}>
-                  Charge ${(totalAmount / 100).toFixed(2)}
-                </button>
+                <CardForm
+                  cardNumber={cardNumber}
+                  expMonth={expMonth}
+                  expYear={expYear}
+                  cvv={cvv}
+                  zip={zip}
+                  onCardNumberChange={setCardNumber}
+                  onExpMonthChange={handleExpMonthChange}
+                  onExpYearChange={handleExpYearChange}
+                  onCvvChange={setCvv}
+                  onZipChange={handleZipChange}
+                  onTokenizeCard={tokenizeCard}
+                  errors={errors}
+                  onErrorClear={handleClearError}
+                />
               )}
             </div>
           )}
         </div>
       )}
+
+      <ErrorDialog
+        show={errorDialog.show}
+        title={errorDialog.title}
+        message={errorDialog.message}
+        isDecline={errorDialog.isDecline}
+        onUseAnotherCard={handleUseAnotherCard}
+        onClose={closeErrorDialog}
+      />
     </div>
   );
 }

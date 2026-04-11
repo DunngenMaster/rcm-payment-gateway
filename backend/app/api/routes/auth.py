@@ -27,3 +27,8 @@ async def exchange_code(payload: CodeExchangeRequest):
         return await auth_handler.exchange_code(payload)
     except Exception as e:
         raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/status")
+async def check_status():
+    return await auth_handler.check_connection()

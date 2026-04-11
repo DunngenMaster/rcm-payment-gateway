@@ -39,7 +39,25 @@ class CloverClient:
 
         response.raise_for_status()
         return response.json()
-    
-    
+
+    async def get(self, endpoint: str):
+        url = f"{self.base_url}{endpoint}"
+        headers = self._get_headers()
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+
+        response.raise_for_status()
+        return response.json()
+
+    async def delete(self, endpoint: str):
+        url = f"{self.base_url}{endpoint}"
+        headers = self._get_headers()
+
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(url, headers=headers)
+
+        response.raise_for_status()
+        return response.json()
 
 clover_client = CloverClient()

@@ -67,6 +67,13 @@ class PaymentHandler:
             RESPONSE_KEY_LINE_ITEM: line_item
         }
 
+    async def delete_line_item(self, order_id: str, line_item_id: str) -> dict:
+        await clover_order_service.delete_line_item(order_id, line_item_id)
+        return {
+            RESPONSE_KEY_SUCCESS: True,
+            RESPONSE_KEY_MESSAGE: "Line item deleted"
+        }
+
     async def get_ecommerce_key(self) -> dict:
         key_data = await clover_payment_service.get_ecommerce_key()
         return {

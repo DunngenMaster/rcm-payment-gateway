@@ -16,4 +16,9 @@ class CloverOrderService:
         payload = LineItemPayload(name, price, quantity)
         return await clover_client.post(endpoint, payload.to_dict())
 
+    async def delete_line_item(self, order_id: str, line_item_id: str):
+        merchant_id = clover_client.get_merchant_id()
+        endpoint = f"/v3/merchants/{merchant_id}/orders/{order_id}/line_items/{line_item_id}"
+        return await clover_client.delete(endpoint)
+
 clover_order_service = CloverOrderService()

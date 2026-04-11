@@ -1,113 +1,91 @@
 # RCM Payment Gateway Demo
 
-A minimal full-stack web application demonstrating Clover Payment Gateway integration for recruiters.
+A minimal full-stack checkout prototype that demonstrates Clover integration using OAuth, merchant-specific ecommerce key retrieval, frontend card tokenization, sandbox charge creation, and local transaction logging.
 
-## Features
+## Overview
 
-- **OAuth Authentication**: Secure Clover merchant authentication
-- **Order Management**: Create orders and add line items
-- **Payment Processing**: Demo payment processing (no real charges)
-- **Transaction Logging**: Local transaction history
-- **React Frontend**: Simple checkout interface
+This project was built as a small, recruiter-friendly prototype to show a clean Clover payment integration without overengineering the stack.
+
+The application supports:
+
+- Clover OAuth2 merchant connection
+- Merchant-specific ecommerce key retrieval through Clover PAKMS
+- Card tokenization in the frontend using Clover sandbox
+- Sandbox charge creation from the backend using the tokenized source
+- Order creation and line item support
+- Local transaction logging for payment attempts
+- A minimal React UI for testing the full flow
 
 ## Tech Stack
 
-- **Backend**: FastAPI (Python)
-- **Frontend**: React + TypeScript + Vite
-- **Payment Gateway**: Clover API (Sandbox)
+### Backend
+- FastAPI
+- Python
+- httpx
+- Pydantic
 
-## Quick Start
+### Frontend
+- React
+- TypeScript
+- Vite
 
-### Prerequisites
-- Python 3.8+
-- Node.js 16+
-- Clover Developer Account
+### Payment Platform
+- Clover Sandbox APIs
 
-### Backend Setup
+## Requirements
 
-```bash
-cd backend
-pip install -r requirements.txt
-cp .env.example .env  # Configure your Clover credentials
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+- Python 3.10+
+- Node.js 18+
+- A Clover sandbox developer app and sandbox merchant account
+- Ecommerce API integration enabled in Clover sandbox settings
+- Public and private Clover ecommerce tokens generated for sandbox testing
 
-### Frontend Setup
+## Clover Configuration
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+This project assumes the Clover app is configured as a web-based sandbox app.
 
-### Clover Setup
+### Clover App Settings
 
-1. Create Clover Developer App at https://sandbox.dev.clover.com/developers/
-2. Set Site URL: `http://localhost:5173`
-3. Enable permissions: Orders Read/Write, Payments Read/Write
-4. Add credentials to `backend/.env`
+Use the following values in Clover sandbox developer settings:
 
-## API Endpoints
+- **Site URL:** `http://localhost:5173`
+- **Alternate Launch Path:** `/`
+- **Default OAuth Response:** `Code`
+- **CORS Domain:** `http://localhost:5173`
 
-### Authentication
-- `GET /auth/start` - Initiate OAuth flow
-- `POST /auth/exchange` - Exchange authorization code
+### Permissions
 
-### Orders & Payments
-- `POST /payment/order` - Create order
-- `POST /payment/line-item` - Add item to order
-- `POST /payment/pay` - Process payment (demo)
-- `GET /payment/transactions` - View transaction logs
+Enable at least:
 
-## Usage
+- Merchant Read
+- Orders Read
+- Orders Write
+- Payments Read
+- Payments Write
 
-1. Open http://localhost:5173
-2. Click "Connect Clover" → Complete OAuth
-3. Create order → Add items → Process payment
-4. View transaction logs at `/payment/transactions`
+### Ecommerce Integration
 
-## Architecture
+Select:
 
-```
-backend/
-├── app/
-│   ├── main.py              # FastAPI app
-│   ├── core/                # Config & constants
-│   ├── services/            # Business logic
-│   ├── clients/             # API clients
-│   ├── db/                  # Data storage
-│   └── api/routes/          # API endpoints
+- **Integration Type:** `API`
 
-frontend/
-├── src/
-│   └── App.tsx              # React checkout UI
-```
+Generate the Clover ecommerce tokens for sandbox use:
 
-## Demo Flow
+- Public token
+- Private token
 
-1. **Authentication**: OAuth2 with Clover
-2. **Order Creation**: REST API call to Clover
-3. **Line Items**: Add products to order
-4. **Payment**: Demo processing (simulated)
-5. **Logging**: Local transaction storage
+## Environment Variables
 
-## Interview Talking Points
+Create `backend/.env` and configure values similar to the following:
 
-- **API Integration**: RESTful design with proper error handling
-- **Authentication**: OAuth2 flow implementation
-- **State Management**: React hooks for UI state
-- **Data Persistence**: JSON-based local storage
-- **Security**: Environment variables, CORS, input validation
-- **Scalability**: Modular service architecture
-
-## Production Considerations
-
-- Replace demo payment with real Clover payment processing
-- Add database (PostgreSQL/MongoDB)
-- Implement proper error handling & logging
-- Add authentication middleware
-- Environment-specific configurations
-
----
-
-Built for technical interviews. Simple, clean, and demonstrative.
+```env
+CLOVER_CLIENT_ID=your_app_id
+CLOVER_CLIENT_SECRET=your_app_secret
+CLOVER_REDIRECT_URI=http://localhost:5173/auth/callback
+CLOVER_AUTH_BASE_URL=https://sandbox.dev.clover.com
+CLOVER_API_BASE_URL=https://apisandbox.dev.clover.com
+CLOVER_ECOMMERCE_BASE_URL=https://scl-sandbox.dev.clover.com
+CLOVER_TOKEN_BASE_URL=https://token-sandbox.dev.clover.com
+CLOVER_ECOMMERCE_PRIVATE_TOKEN=your_private_ecommerce_token
+FRONTEND_URL=http://localhost:5173
+TOKEN_ENCRYPTION_KEY=your_fernet_key
