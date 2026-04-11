@@ -11,7 +11,8 @@ class CloverOAuthService:
         params = {
             "client_id": settings.CLOVER_CLIENT_ID,
             "response_type": "code",
-            "redirect_uri": settings.CLOVER_REDIRECT_URI
+            "redirect_uri": settings.CLOVER_REDIRECT_URI,
+            "scope": "READ WRITE"
         }
         return f"{settings.CLOVER_AUTH_BASE_URL}{OAUTH_AUTHORIZE_ENDPOINT}?{urlencode(params)}"
 
