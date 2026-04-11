@@ -1,125 +1,82 @@
+"""
+Payment API Router - Routes payment endpoints to PaymentHandler.
+"""
+
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from app.services.clover_order_service import clover_order_service
-from app.services.clover_payment_service import clover_payment_service
-from app.db.transaction_store import transaction_store
 
-router = APIRouter(prefix="/payment", tags=["payment"])
+from app.models import (
+    CreateOrderRequest,
+    AddLineItemRequest,
+    TokenizeCardRequest,
+    CreateChargeRequest,
+)
+from app.api.handlers import PaymentHandler
+from app.core.constants import (
+    PAYMENT_ROUTER_PREFIX,
+    PAYMENT_ROUTER_TAG,
+    PAYMENT_ROUTE_ORDER,
+    PAYMENT_ROUTE_LINE_ITEM,
+    PAYMENT_ROUTE_ECOMMERCE_KEY,
+    PAYMENT_ROUTE_TOKENIZE,
+    PAYMENT_ROUTE_CHARGE,
+    PAYMENT_ROUTE_TRANSACTIONS,
+    HTTP_STATUS_INTERNAL_SERVER_ERROR,
+    HTTP_STATUS_BAD_REQUEST,
+)
 
-class CreateOrderRequest(BaseModel):
-    title: str = "Demo Order"
-    currency: str = "USD"
+# Initialize handler and router
+payment_handler = PaymentHandler()
+router = APIRouter(prefix=PAYMENT_ROUTER_PREFIX, tags=[PAYMENT_ROUTER_TAG])
 
-class AddLineItemRequest(BaseModel):
-    order_id: str
-    name: str
-    price: int
-    quantity: int = 1
 
-class CreatePaymentRequest(BaseModel):
-    order_id: str
-    amount: int
-    tip_amount: int = 0
-
-@router.post("/order")
+@router.post(PAYMENT_ROUTE_ORDER)
 async def create_order(payload: CreateOrderRequest):
     try:
-        order = await clover_order_service.create_order(payload.title, payload.currency)
-
-        # Log transaction
-        transaction_store.log_transaction("order_created", {
-            "order_id": order.get("id"),
-            "title": payload.title,
-            "currency": payload.currency
-        })
-
-        return {
-            "success": True,
-            "message": "Order created successfully",
-            "order": order
-        }
+        return await payment_handler.create_order(payload)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.post("/line-item")
+
+@router.post(PAYMENT_ROUTE_LINE_ITEM)
 async def add_line_item(payload: AddLineItemRequest):
     try:
-        line_item = await clover_order_service.add_line_item(
-            payload.order_id, payload.name, payload.price, payload.quantity
-        )
-
-        # Log transaction
-        transaction_store.log_transaction("line_item_added", {
-            "order_id": payload.order_id,
-            "line_item_id": line_item.get("id"),
-            "name": payload.name,
-            "price": payload.price,
-            "quantity": payload.quantity
-        })
-
-        return {
-            "success": True,
-            "message": "Line item added successfully",
-            "line_item": line_item
-        }
+        return await payment_handler.add_line_item(payload)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.post("/pay")
-async def create_payment(payload: CreatePaymentRequest):
+
+@router.get(PAYMENT_ROUTE_ECOMMERCE_KEY)
+async def get_ecommerce_key():
     try:
-        # Use demo payment for recruiter demo (no real card processing)
-        payment = await clover_payment_service.create_demo_payment(
-            payload.order_id, payload.amount, payload.tip_amount
-        )
-
-        # Log transaction
-        transaction_store.log_transaction("payment_processed", {
-            "order_id": payload.order_id,
-            "payment_id": payment.get("id"),
-            "amount": payload.amount,
-            "tip_amount": payload.tip_amount,
-            "result": payment.get("result")
-        })
-
-        return {
-            "success": True,
-            "message": "Demo payment processed successfully",
-            "payment": payment
-        }
+        return await payment_handler.get_ecommerce_key()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.get("/order/{order_id}")
-async def get_order(order_id: str):
+
+@router.post(PAYMENT_ROUTE_TOKENIZE)
+async def tokenize_card(payload: TokenizeCardRequest):
     try:
-        order = await clover_order_service.get_order(order_id)
-        return {
-            "success": True,
-            "order": order
-        }
+        return await payment_handler.tokenize_card(payload)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.get("/order/{order_id}/payments")
-async def get_order_payments(order_id: str):
+
+@router.post(PAYMENT_ROUTE_CHARGE)
+async def create_charge(payload: CreateChargeRequest):
     try:
-        payments = await clover_payment_service.get_order_payments(order_id)
-        return {
-            "success": True,
-            "payments": payments
-        }
+        return await payment_handler.create_charge(payload)
+    except ValueError as e:
+        error_msg = str(e)
+        raise HTTPException(status_code=HTTP_STATUS_BAD_REQUEST, detail=error_msg)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=error_msg)
 
-@router.get("/transactions")
+
+@router.get(PAYMENT_ROUTE_TRANSACTIONS)
 async def get_transactions():
-    """Get all logged transactions"""
     try:
-        transactions = transaction_store.get_all_transactions()
-        return {
-            "success": True,
-            "transactions": transactions
-        }
+        return payment_handler.get_transactions()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
+
