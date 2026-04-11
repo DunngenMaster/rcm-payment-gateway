@@ -1,49 +1,105 @@
-from app.clients.clover_client import clover_client
-import time
+from app.db.token_store import token_store
+from app.core.config import settings
+from app.core.constants import (
+    ERROR_NO_ACCESS_TOKEN,
+    ERROR_AMOUNT_SOURCE_REQUIRED,
+    CLOVER_PAKMS_ENDPOINT,
+    CLOVER_CHARGES_ENDPOINT,
+    HEADER_AUTHORIZATION,
+    HEADER_ACCEPT,
+    HEADER_CONTENT_TYPE,
+    HEADER_X_FORWARDED_FOR,
+    CONTENT_TYPE_JSON,
+    AUTH_SCHEME_BEARER,
+    TRANSACTION_STATUS_SUCCESS,
+    TRANSACTION_TYPE_CHARGE,
+    DEFAULT_CHARGE_CURRENCY,
+    DEFAULT_CHARGE_DESCRIPTION,
+)
+from app.models import ChargePayload
+from app.db.transaction_store import save_transaction
+import httpx
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class CloverPaymentService:
-    async def create_payment(self, order_id: str, amount: int, tip_amount: int = 0):
-        merchant_id = clover_client.get_merchant_id()
-        endpoint = f"/v3/merchants/{merchant_id}/orders/{order_id}/payments"
+    async def get_ecommerce_key(self):
+        access_token = token_store.get_access_token()
+        if not access_token:
+            raise ValueError(ERROR_NO_ACCESS_TOKEN)
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{settings.CLOVER_ECOMMERCE_BASE_URL}{CLOVER_PAKMS_ENDPOINT}",
+                headers={
+                    HEADER_AUTHORIZATION: f"{AUTH_SCHEME_BEARER}{access_token}",
+                    HEADER_ACCEPT: CONTENT_TYPE_JSON
+                }
+            )
+            response.raise_for_status()
+            return response.json()
 
-        payload = {
-            "amount": amount,
-            "tipAmount": tip_amount
-        }
-        return await clover_client.post(endpoint, payload)
-
-    async def create_demo_payment(self, order_id: str, amount: int, tip_amount: int = 0):
-        """Demo payment that simulates successful payment processing"""
-        # In a real app, this would integrate with Clover's payment processing
-        # For demo purposes, we'll simulate a successful payment
-
-        payment_id = f"demo_{order_id}_{int(time.time())}"
-
-        demo_payment = {
-            "id": payment_id,
-            "order": {"id": order_id},
-            "amount": amount,
-            "tipAmount": tip_amount,
-            "taxAmount": 0,
-            "result": "SUCCESS",
-            "createdTime": int(time.time() * 1000),
-            "modifiedTime": int(time.time() * 1000),
-            "tender": {
-                "label": "Demo Card",
-                "labelKey": "com.clover.tender.demo"
+    async def create_charge(self, amount: int, source: str, currency: str = DEFAULT_CHARGE_CURRENCY, 
+                           description: str = DEFAULT_CHARGE_DESCRIPTION):
+        access_token = token_store.get_access_token()
+        
+        if not access_token:
+            raise ValueError(ERROR_NO_ACCESS_TOKEN)
+        
+        if not amount or not source:
+            raise ValueError(ERROR_AMOUNT_SOURCE_REQUIRED)
+        
+        try:
+            payload = ChargePayload(amount, source, currency, description)
+            
+            url = f"{settings.CLOVER_ECOMMERCE_BASE_URL}{CLOVER_CHARGES_ENDPOINT}"
+            headers = {
+                HEADER_AUTHORIZATION: f"{AUTH_SCHEME_BEARER}{access_token}",
+                HEADER_ACCEPT: CONTENT_TYPE_JSON,
+                HEADER_CONTENT_TYPE: CONTENT_TYPE_JSON,
+                HEADER_X_FORWARDED_FOR: "127.0.0.1"
             }
-        }
-
-        return demo_payment
-
-    async def get_payment(self, order_id: str, payment_id: str):
-        merchant_id = clover_client.get_merchant_id()
-        endpoint = f"/v3/merchants/{merchant_id}/orders/{order_id}/payments/{payment_id}"
-        return await clover_client.get(endpoint)
-
-    async def get_order_payments(self, order_id: str):
-        merchant_id = clover_client.get_merchant_id()
-        endpoint = f"/v3/merchants/{merchant_id}/orders/{order_id}/payments"
-        return await clover_client.get(endpoint)
+            
+            logger.info(f"Creating charge: amount={amount}, source={source}, currency={currency}")
+            logger.info(f"POST {url}")
+            logger.info(f"Payload: {payload.to_dict()}")
+            logger.info(f"Auth token present: {bool(access_token)}, length: {len(access_token) if access_token else 0}")
+            
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, json=payload.to_dict(), headers=headers)
+                
+                logger.info(f"Clover response status: {response.status_code}")
+                logger.info(f"Response body: {response.text}")
+                
+                response.raise_for_status()
+                charge = response.json()
+                
+                save_transaction({
+                    "type": TRANSACTION_TYPE_CHARGE,
+                    "amount": amount,
+                    "source": source,
+                    "currency": currency,
+                    "description": description,
+                    "status": TRANSACTION_STATUS_SUCCESS,
+                    "charge_id": charge.get("id"),
+                    "clover_response": charge
+                })
+                
+                logger.info(f"Charge created successfully: {charge.get('id')}")
+                return charge
+        except httpx.TimeoutException as e:
+            error_detail = f"Clover API timeout: Request took too long. Check OAuth token validity and Clover API status."
+            logger.error(error_detail)
+            raise ValueError(error_detail)
+        except httpx.HTTPStatusError as e:
+            error_detail = f"Clover API error: {e.response.status_code} - {e.response.text}"
+            logger.error(error_detail)
+            raise ValueError(error_detail)
+        except Exception as e:
+            error_detail = f"Charge creation failed: {type(e).__name__} - {str(e)}"
+            logger.error(error_detail)
+            raise ValueError(error_detail)
 
 clover_payment_service = CloverPaymentService()
