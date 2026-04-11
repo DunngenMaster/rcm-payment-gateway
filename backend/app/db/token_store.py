@@ -1,6 +1,7 @@
 import json
 import os
 from app.core.constants import (
+    OAUTH_PARAM_MERCHANT_ID,
     TOKEN_FILE_PATH,
     FILE_MODE_READ,
     FILE_MODE_WRITE,
@@ -26,5 +27,11 @@ class TokenStore:
         if not token_data:
             return None
         return token_data.get(TOKEN_JSON_KEY_ACCESS_TOKEN)
+    
+    def get_merchant_id(self):
+        token_data = self.load_token()
+        if not token_data:
+            return None
+        return token_data.get(OAUTH_PARAM_MERCHANT_ID)
 
 token_store = TokenStore()
