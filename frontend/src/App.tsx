@@ -33,7 +33,6 @@ import {
   MSG_CARD_TOKENIZING,
   MSG_CARD_TOKENIZED,
   MSG_CARD_TOKENIZE_FAILED,
-  MSG_CARD_TOKENIZE_ERROR,
   MSG_PAYMENT_PROCESSING,
   MSG_PAYMENT_SUCCESSFUL,
   MSG_PAYMENT_ERROR,
@@ -318,16 +317,47 @@ function App() {
           zip: zip
         })
       });
+      
       const data = await response.json();
+      
+      // Check if it's a Clover tokenization error (400 Bad Request)
+      if (!response.ok && data.detail && data.detail.includes("400 Bad Request")) {
+        setErrorDialog({
+          show: true,
+          title: "Invalid Card",
+          message: "The card details are invalid. Please use a valid card.",
+          isDecline: false
+        });
+        setMessage("");
+        setCardNumber("");
+        return;
+      }
+      
       if (data.success && data.token_data && data.token_data.id) {
         setSourceToken(data.token_data.id);
         setErrors({});
         setMessage(`${MSG_CARD_TOKENIZED}${data.token_data.id}`);
+      } else if (!response.ok) {
+        setErrorDialog({
+          show: true,
+          title: "Tokenization Error",
+          message: "Unable to tokenize card. Please use another card and try again.",
+          isDecline: false
+        });
+        setMessage("");
+        setCardNumber("");
       } else {
         setMessage(`${MSG_CARD_TOKENIZE_FAILED}${JSON.stringify(data)}`);
       }
     } catch (error) {
-      setMessage(`${MSG_CARD_TOKENIZE_ERROR}${String(error)}`);
+      setErrorDialog({
+        show: true,
+        title: "Tokenization Error",
+        message: "Unable to tokenize card. Please use another card and try again.",
+        isDecline: false
+      });
+      setMessage("");
+      setCardNumber("");
     }
   };
 
@@ -460,7 +490,6 @@ function App() {
 
   return (
     <div style={{
-      maxWidth: "600px",
       margin: "40px auto",
       fontFamily: "Arial, sans-serif",
       padding: "20px"

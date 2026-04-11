@@ -34,6 +34,9 @@ async def create_order(payload: CreateOrderRequest):
     try:
         return await payment_handler.create_order(payload)
     except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"CREATE ORDER ERROR: {error_detail}")
         raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
 

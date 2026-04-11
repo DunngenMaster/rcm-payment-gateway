@@ -9,8 +9,13 @@ def save_transaction(record: dict):
     
     transactions = []
     if TRANSACTIONS_FILE.exists():
-        with open(TRANSACTIONS_FILE) as f:
-            transactions = json.load(f)
+        try:
+            with open(TRANSACTIONS_FILE) as f:
+                content = f.read().strip()
+                if content:
+                    transactions = json.loads(content)
+        except (json.JSONDecodeError, Exception):
+            transactions = []
     
     transactions.append(record)
     
@@ -21,8 +26,14 @@ def list_transactions():
     if not TRANSACTIONS_FILE.exists():
         return []
     
-    with open(TRANSACTIONS_FILE) as f:
-        return json.load(f)
+    try:
+        with open(TRANSACTIONS_FILE) as f:
+            content = f.read().strip()
+            if not content:
+                return []
+            return json.loads(content)
+    except (json.JSONDecodeError, Exception):
+        return []
 
 transaction_store = type('TransactionStore', (), {
     'log_transaction': lambda self, t, d: save_transaction({**d, 'type': t})
