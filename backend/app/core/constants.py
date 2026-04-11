@@ -28,6 +28,11 @@ AUTH_ROUTER_TAG = "auth"
 AUTH_START_ROUTE = "/start"
 AUTH_EXCHANGE_ROUTE = "/exchange"
 
+PAYMENT_ROUTER_PREFIX = "/payment"
+PAYMENT_ROUTER_TAG = "payment"
+
+ORDER_ROUTER_PREFIX = "/order"
+
 # ============================================================================
 # Response Keys and Values
 # ============================================================================
@@ -43,6 +48,7 @@ OAUTH_PARAM_CLIENT_ID = "client_id"
 OAUTH_PARAM_RESPONSE_TYPE = "response_type"
 OAUTH_RESPONSE_TYPE_CODE = "code"
 OAUTH_PARAM_REDIRECT_URI = "redirect_uri"
+OAUTH_PARAM_MERCHANT_ID = "merchant_id"
 
 OAUTH_PAYLOAD_CLIENT_ID = "client_id"
 OAUTH_PAYLOAD_CLIENT_SECRET = "client_secret"
