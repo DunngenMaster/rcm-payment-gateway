@@ -7,6 +7,7 @@ from app.core.constants import (
     RESPONSE_KEY_MESSAGE,
     RESPONSE_KEY_TOKEN_DATA,
     MSG_AUTH_CONNECTED,
+    OAUTH_PARAM_MERCHANT_ID,
 )
 
 
@@ -20,6 +21,10 @@ class AuthHandler:
             payload.code,
             payload.merchant_id
         )
+        # Save merchant_id along with token data
+        token_data[OAUTH_PARAM_MERCHANT_ID] = payload.merchant_id
+        token_store.save_token(token_data)
+        
         return {
             RESPONSE_KEY_SUCCESS: True,
             RESPONSE_KEY_MESSAGE: MSG_AUTH_CONNECTED,
