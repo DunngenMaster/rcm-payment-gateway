@@ -14,6 +14,9 @@ class Settings:
         self.CLOVER_ECOMMERCE_PUBLIC_TOKEN = os.getenv("CLOVER_ECOMMERCE_PUBLIC_TOKEN")
         self.CLOVER_ECOMMERCE_PRIVATE_TOKEN = os.getenv("CLOVER_ECOMMERCE_PRIVATE_TOKEN")
         self.CLOVER_TOKEN_BASE_URL = os.getenv("CLOVER_TOKEN_BASE_URL")
+        self.CLOVER_TEST_API_TOKEN = os.getenv("CLOVER_TEST_API_TOKEN")
+        self.CLOVER_TEST_MERCHANT_ID = os.getenv("CLOVER_TEST_MERCHANT_ID")
         self.FRONTEND_URL = os.getenv("FRONTEND_URL")
+        self.TOKEN_ENCRYPTION_KEY = os.getenv("TOKEN_ENCRYPTION_KEY")
 
 settings = Settings()
