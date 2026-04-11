@@ -30,16 +30,6 @@ class CloverClient:
 
         return merchant_id
 
-    async def get(self, endpoint: str, params: dict | None = None):
-        url = f"{self.base_url}{endpoint}"
-        headers = self._get_headers()
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers, params=params)
-
-        response.raise_for_status()
-        return response.json()
-
     async def post(self, endpoint: str, json_data: dict):
         url = f"{self.base_url}{endpoint}"
         headers = self._get_headers()
