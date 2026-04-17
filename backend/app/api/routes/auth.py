@@ -40,7 +40,7 @@ class TokenResponse(BaseModel):
 @router.get(AUTH_START_ROUTE)
 async def start_auth():
     auth_url = await auth_handler.start_auth()
-    return RedirectResponse(url=auth_url)
+    return { "success": True, "auth_url": auth_url }
 
 
 @router.post(AUTH_EXCHANGE_ROUTE)
