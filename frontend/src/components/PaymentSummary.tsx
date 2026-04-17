@@ -8,7 +8,7 @@ interface LineItem {
 interface PaymentSummaryProps {
   lineItems: LineItem[];
   totalAmount: number;
-  onGetEcommerceKey: () => void;
+  onAddCardDetails: () => void;
   onProcessPayment: () => void;
   onRemoveLineItem: (lineItemId: string) => void;
   sourceToken: string | null;
@@ -44,7 +44,7 @@ export const PaymentSummary = (props: PaymentSummaryProps) => {
       )}
 
       {props.lineItems.length > 0 && !props.ecommerceKey && (
-        <button onClick={props.onGetEcommerceKey} style={{
+        <button onClick={props.onAddCardDetails} style={{
           padding: "10px 20px",
           fontSize: "14px",
           cursor: "pointer",
@@ -54,7 +54,7 @@ export const PaymentSummary = (props: PaymentSummaryProps) => {
           borderRadius: "4px",
           marginRight: "10px"
         }}>
-          Get Ecommerce Key
+          Add Card Details
         </button>
       )}
 
