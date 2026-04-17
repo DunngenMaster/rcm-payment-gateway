@@ -134,7 +134,7 @@ function App() {
       if (!data.connected) {
         setMessage("Clover session expired. Redirecting to reconnect...");
         setTimeout(() => {
-          window.location.href = `${API_BASE_URL}/auth/start`;
+          window.location.href = `${API_BASE_URL}/auth/`;
         }, 1500);
         return false;
       }
@@ -185,8 +185,11 @@ function App() {
     const isConnected = await checkCloverConnection();
     if (!isConnected) return;
 
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
+
     try {
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_ORDER}`, {
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_ORDER}${queryParam}`, {
         method: METHOD_POST,
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
         body: JSON.stringify({ title: "Demo Checkout", currency: "USD" })
@@ -217,8 +220,11 @@ function App() {
 
     if (!currentOrder) return;
 
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
+
     try {
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_LINE_ITEM}`, {
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_LINE_ITEM}${queryParam}`, {
         method: METHOD_POST,
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
         body: JSON.stringify({
@@ -250,9 +256,12 @@ function App() {
   const removeLineItem = async (lineItemId: string) => {
     if (!currentOrder) return;
 
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const merchantParam = merchantId ? `&merchant_id=${merchantId}` : "";
+
     try {
       const response = await fetch(
-        `${API_BASE_URL}${PAYMENT_LINE_ITEM}?order_id=${currentOrder.id}&line_item_id=${lineItemId}`,
+        `${API_BASE_URL}${PAYMENT_LINE_ITEM}?order_id=${currentOrder.id}&line_item_id=${lineItemId}${merchantParam}`,
         { method: "DELETE" }
       );
       const data = await response.json();
@@ -269,9 +278,12 @@ function App() {
     const isConnected = await checkCloverConnection();
     if (!isConnected) return;
 
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
+
     try {
       setMessage(MSG_ECOMMERCE_KEY_FETCH);
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_ECOMMERCE_KEY}`);
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_ECOMMERCE_KEY}${queryParam}`);
       const data = await response.json();
       if (data.success) {
         setEcommerceKey(data.key_data.apiAccessKey);
@@ -305,7 +317,10 @@ function App() {
 
     try {
       setMessage(MSG_CARD_TOKENIZING);
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_TOKENIZE_CARD}`, {
+      const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+      const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
+      
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_TOKENIZE_CARD}${queryParam}`, {
         method: METHOD_POST,
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
         body: JSON.stringify({
@@ -378,19 +393,42 @@ function App() {
       return;
     }
 
-    if (!currentOrder || !sourceToken) return;
+    if (!currentOrder) {
+      setErrorDialog({
+        show: true,
+        title: "No Order",
+        message: "Please create an order first.",
+        isDecline: false
+      });
+      return;
+    }
+
+    if (!sourceToken) {
+      setErrorDialog({
+        show: true,
+        title: "Tokenization Required",
+        message: "Please click 'Tokenize Card' to secure your card details before submitting payment.",
+        isDecline: false
+      });
+      return;
+    }
+
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
 
     try {
       setMessage(MSG_PAYMENT_PROCESSING);
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_CHARGE}`, {
+      const chargeBody = {
+        amount: totalAmount,
+        source: sourceToken,
+        currency: DEFAULT_CURRENCY,
+        description: "Demo Clover payment"
+      };
+      
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_CHARGE}${queryParam}`, {
         method: METHOD_POST,
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
-        body: JSON.stringify({
-          amount: totalAmount,
-          source: sourceToken,
-          currency: DEFAULT_CURRENCY,
-          description: "Demo Clover payment"
-        })
+        body: JSON.stringify(chargeBody)
       });
       const data = await response.json();
 

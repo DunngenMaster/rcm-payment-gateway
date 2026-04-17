@@ -18,5 +18,9 @@ class Settings:
         self.CLOVER_TEST_MERCHANT_ID = os.getenv("CLOVER_TEST_MERCHANT_ID")
         self.FRONTEND_URL = os.getenv("FRONTEND_URL")
         self.TOKEN_ENCRYPTION_KEY = os.getenv("TOKEN_ENCRYPTION_KEY")
+        self.DATABASE_URL = os.getenv("DATABASE_URL")
+        self.JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+        self.JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+        self.JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 
 settings = Settings()
