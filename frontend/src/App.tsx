@@ -1,7 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import {
   API_BASE_URL,
-  AUTH_START,
   AUTH_EXCHANGE,
   PAYMENT_ORDER,
   PAYMENT_LINE_ITEM,
@@ -26,10 +25,10 @@ import {
   MSG_ORDER_FAILED,
   MSG_ITEM_ADDED,
   MSG_ITEM_FAILED,
-  MSG_ECOMMERCE_KEY_FETCH,
-  MSG_ECOMMERCE_KEY_READY,
-  MSG_ECOMMERCE_KEY_FAILED,
-  MSG_ECOMMERCE_KEY_REQUIRED,
+  MSG_ADD_CARD_DETAILS,
+  MSG_CARD_DETAILS_FETCH,
+  MSG_CARD_DETAILS_FAILED,
+  MSG_CARD_DETAILS_REQUIRED,
   MSG_CARD_TOKENIZING,
   MSG_CARD_TOKENIZED,
   MSG_CARD_TOKENIZE_FAILED,
@@ -134,7 +133,7 @@ function App() {
       if (!data.connected) {
         setMessage("Clover session expired. Redirecting to reconnect...");
         setTimeout(() => {
-          window.location.href = `${API_BASE_URL}/auth/start`;
+          window.location.href = `${API_BASE_URL}/auth/`;
         }, 1500);
         return false;
       }
@@ -174,19 +173,36 @@ function App() {
           }
         })
         .catch(() => setMessage(MSG_CONNECT_ERROR));
+    } else {
+      // No code in URL, fetch auth URL and redirect to Clover
+      setMessage(MSG_CONNECTING);
+      fetch(`${API_BASE_URL}/auth/start`)
+        .then(async (res) => {
+          const data = await res.json();
+          if (data.success && data.auth_url) {
+            window.location.href = data.auth_url;
+          }
+        })
+        .catch(() => setMessage(MSG_CONNECT_ERROR));
     }
   }, []);
 
-  const handleConnect = () => {
-    window.location.href = `${API_BASE_URL}${AUTH_START}`;
-  };
+  // Auto-create order when connected
+  useEffect(() => {
+    if (isConnected && !currentOrder) {
+      createOrder();
+    }
+  }, [isConnected]);
 
   const createOrder = async () => {
     const isConnected = await checkCloverConnection();
     if (!isConnected) return;
 
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
+
     try {
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_ORDER}`, {
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_ORDER}${queryParam}`, {
         method: METHOD_POST,
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
         body: JSON.stringify({ title: "Demo Checkout", currency: "USD" })
@@ -217,8 +233,11 @@ function App() {
 
     if (!currentOrder) return;
 
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
+
     try {
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_LINE_ITEM}`, {
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_LINE_ITEM}${queryParam}`, {
         method: METHOD_POST,
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
         body: JSON.stringify({
@@ -250,9 +269,12 @@ function App() {
   const removeLineItem = async (lineItemId: string) => {
     if (!currentOrder) return;
 
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const merchantParam = merchantId ? `&merchant_id=${merchantId}` : "";
+
     try {
       const response = await fetch(
-        `${API_BASE_URL}${PAYMENT_LINE_ITEM}?order_id=${currentOrder.id}&line_item_id=${lineItemId}`,
+        `${API_BASE_URL}${PAYMENT_LINE_ITEM}?order_id=${currentOrder.id}&line_item_id=${lineItemId}${merchantParam}`,
         { method: "DELETE" }
       );
       const data = await response.json();
@@ -265,20 +287,23 @@ function App() {
     }
   };
 
-  const getEcommerceKey = async () => {
+  const addCardDetails = async () => {
     const isConnected = await checkCloverConnection();
     if (!isConnected) return;
 
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
+
     try {
-      setMessage(MSG_ECOMMERCE_KEY_FETCH);
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_ECOMMERCE_KEY}`);
+      setMessage(MSG_CARD_DETAILS_FETCH);
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_ECOMMERCE_KEY}${queryParam}`);
       const data = await response.json();
       if (data.success) {
         setEcommerceKey(data.key_data.apiAccessKey);
-        setMessage(MSG_ECOMMERCE_KEY_READY);
+        setMessage(MSG_ITEM_ADDED);
       }
     } catch (error) {
-      setMessage(MSG_ECOMMERCE_KEY_FAILED);
+      setMessage(MSG_CARD_DETAILS_FAILED);
     }
   };
 
@@ -299,13 +324,16 @@ function App() {
     }
 
     if (!ecommerceKey) {
-      setMessage(MSG_ECOMMERCE_KEY_REQUIRED);
+      setMessage(MSG_CARD_DETAILS_REQUIRED);
       return;
     }
 
     try {
       setMessage(MSG_CARD_TOKENIZING);
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_TOKENIZE_CARD}`, {
+      const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+      const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
+      
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_TOKENIZE_CARD}${queryParam}`, {
         method: METHOD_POST,
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
         body: JSON.stringify({
@@ -336,7 +364,7 @@ function App() {
       if (data.success && data.token_data && data.token_data.id) {
         setSourceToken(data.token_data.id);
         setErrors({});
-        setMessage(`${MSG_CARD_TOKENIZED}${data.token_data.id}`);
+        setMessage("Card accepted - Ready to charge");
       } else if (!response.ok) {
         setErrorDialog({
           show: true,
@@ -378,19 +406,42 @@ function App() {
       return;
     }
 
-    if (!currentOrder || !sourceToken) return;
+    if (!currentOrder) {
+      setErrorDialog({
+        show: true,
+        title: "No Order",
+        message: "Please create an order first.",
+        isDecline: false
+      });
+      return;
+    }
+
+    if (!sourceToken) {
+      setErrorDialog({
+        show: true,
+        title: "Tokenization Required",
+        message: "Please click 'Tokenize Card' to secure your card details before submitting payment.",
+        isDecline: false
+      });
+      return;
+    }
+
+    const merchantId = localStorage.getItem(STORAGE_MERCHANT_ID);
+    const queryParam = merchantId ? `?merchant_id=${merchantId}` : "";
 
     try {
       setMessage(MSG_PAYMENT_PROCESSING);
-      const response = await fetch(`${API_BASE_URL}${PAYMENT_CHARGE}`, {
+      const chargeBody = {
+        amount: totalAmount,
+        source: sourceToken,
+        currency: DEFAULT_CURRENCY,
+        description: "Demo Clover payment"
+      };
+      
+      const response = await fetch(`${API_BASE_URL}${PAYMENT_CHARGE}${queryParam}`, {
         method: METHOD_POST,
         headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
-        body: JSON.stringify({
-          amount: totalAmount,
-          source: sourceToken,
-          currency: DEFAULT_CURRENCY,
-          description: "Demo Clover payment"
-        })
+        body: JSON.stringify(chargeBody)
       });
       const data = await response.json();
 
@@ -497,54 +548,32 @@ function App() {
       <h1>RCM Payment Gateway Demo</h1>
       <p>{message}</p>
 
-      {!isConnected ? (
-        <button onClick={handleConnect} style={{
-          padding: "10px 20px",
-          fontSize: "16px",
-          cursor: "pointer",
-          backgroundColor: "#4CAF50",
-          color: "white",
-          border: "none",
-          borderRadius: "4px"
-        }}>
-          Connect Clover
-        </button>
-      ) : (
+      {isConnected ? (
         <div>
-          {!currentOrder ? (
-            <button onClick={createOrder} style={{
-              padding: "10px 20px",
-              fontSize: "16px",
-              cursor: "pointer",
-              backgroundColor: "#2196F3",
-              color: "white",
-              border: "none",
-              borderRadius: "4px"
-            }}>
-              Create New Order
-            </button>
-          ) : (
+          {currentOrder && (
             <div>
               <h3>Order: {currentOrder.title}</h3>
 
-              <OrderForm
-                itemName={itemName}
-                itemPrice={itemPrice}
-                itemQuantity={itemQuantity}
-                onItemNameChange={setItemName}
-                onItemPriceChange={setItemPrice}
-                onItemQuantityChange={setItemQuantity}
-                onAddItem={addLineItem}
-                errors={errors}
-                onErrorClear={handleClearError}
-              />
+              {!sourceToken && (
+                <OrderForm
+                  itemName={itemName}
+                  itemPrice={itemPrice}
+                  itemQuantity={itemQuantity}
+                  onItemNameChange={setItemName}
+                  onItemPriceChange={setItemPrice}
+                  onItemQuantityChange={setItemQuantity}
+                  onAddItem={addLineItem}
+                  errors={errors}
+                  onErrorClear={handleClearError}
+                />
+              )}
 
               <PaymentSummary
                 lineItems={lineItems}
                 totalAmount={totalAmount}
                 ecommerceKey={ecommerceKey}
                 sourceToken={sourceToken}
-                onGetEcommerceKey={getEcommerceKey}
+                onAddCardDetails={addCardDetails}
                 onProcessPayment={processPayment}
                 onRemoveLineItem={removeLineItem}
               />
@@ -569,7 +598,7 @@ function App() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
       <ErrorDialog
         show={errorDialog.show}

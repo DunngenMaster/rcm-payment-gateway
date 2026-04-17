@@ -4,7 +4,6 @@
 export const API_BASE_URL = "http://localhost:8000";
 
 // API Endpoints
-export const AUTH_START = "/auth/start";
 export const AUTH_EXCHANGE = "/auth/exchange";
 export const PAYMENT_ORDER = "/payment/order";
 export const PAYMENT_LINE_ITEM = "/payment/line-item";
@@ -41,10 +40,11 @@ export const MSG_ORDER_FAILED = "Failed to create order";
 export const MSG_ITEM_ADDED = "Item added to order";
 export const MSG_ITEM_FAILED = "Failed to add item";
 
-export const MSG_ECOMMERCE_KEY_FETCH = "Fetching Ecommerce key...";
-export const MSG_ECOMMERCE_KEY_READY = "Ecommerce key ready";
-export const MSG_ECOMMERCE_KEY_FAILED = "Failed to get Ecommerce key";
-export const MSG_ECOMMERCE_KEY_REQUIRED = "Get Ecommerce key first";
+export const MSG_ADD_CARD_DETAILS = "Add Card Details";
+export const MSG_CARD_DETAILS_FETCH = "Fetching card details...";
+export const MSG_CARD_DETAILS_READY = "Card details ready";
+export const MSG_CARD_DETAILS_FAILED = "Failed to add card details";
+export const MSG_CARD_DETAILS_REQUIRED = "Add card details first";
 
 export const MSG_CARD_TOKENIZING = "Tokenizing card...";
 export const MSG_CARD_TOKENIZED = "Card tokenized: ";

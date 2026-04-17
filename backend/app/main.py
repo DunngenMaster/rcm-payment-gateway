@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.health import router as health_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.payment import router as payments_router
+from app.core.database import engine, Base
+from app.db.models import User, Merchant, Order, LineItem, Payment
 
 from app.core.constants import (
     API_TITLE,
@@ -12,6 +14,8 @@ from app.core.constants import (
     CORS_ALLOW_METHODS,
     CORS_ALLOW_HEADERS,
 )
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=API_TITLE, version=API_VERSION)
 

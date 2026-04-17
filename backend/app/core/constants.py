@@ -64,6 +64,11 @@ CLOVER_TOKEN_SANDBOX_URL = "https://token-sandbox.dev.clover.com"
 # Clover Payment Parameters
 CLOVER_ECOMIND_ECOM = "ecom"
 CLOVER_CARD_KEY = "card"
+CLOVER_CARD_NUMBER = "number"
+CLOVER_CARD_EXP_MONTH = "exp_month"
+CLOVER_CARD_EXP_YEAR = "exp_year"
+CLOVER_CARD_CVV = "cvv"
+CLOVER_CARD_ZIP = "zip"
 
 # Transaction Status
 TRANSACTION_STATUS_SUCCESS = "success"

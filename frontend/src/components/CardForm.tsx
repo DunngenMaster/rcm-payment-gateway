@@ -108,7 +108,7 @@ export const CardForm = (props: CardFormProps) => {
         borderRadius: "4px",
         marginTop: "10px"
       }}>
-        Tokenize Card
+        Proceed to Payment
       </button>
     </div>
   );

@@ -1,8 +1,4 @@
-"""
-Payment API Router - Routes payment endpoints to PaymentHandler.
-"""
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.models import (
     CreateOrderRequest,
@@ -30,9 +26,9 @@ router = APIRouter(prefix=PAYMENT_ROUTER_PREFIX, tags=[PAYMENT_ROUTER_TAG])
 
 
 @router.post(PAYMENT_ROUTE_ORDER)
-async def create_order(payload: CreateOrderRequest):
+async def create_order(payload: CreateOrderRequest, merchant_id: str = Query(None)):
     try:
-        return await payment_handler.create_order(payload)
+        return await payment_handler.create_order(payload, merchant_id)
     except Exception as e:
         import traceback
         error_detail = f"{str(e)}\n{traceback.format_exc()}"
@@ -41,41 +37,41 @@ async def create_order(payload: CreateOrderRequest):
 
 
 @router.post(PAYMENT_ROUTE_LINE_ITEM)
-async def add_line_item(payload: AddLineItemRequest):
+async def add_line_item(payload: AddLineItemRequest, merchant_id: str = Query(None)):
     try:
-        return await payment_handler.add_line_item(payload)
+        return await payment_handler.add_line_item(payload, merchant_id)
     except Exception as e:
         raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.delete(PAYMENT_ROUTE_LINE_ITEM)
-async def delete_line_item(order_id: str, line_item_id: str):
+async def delete_line_item(order_id: str, line_item_id: str, merchant_id: str = Query(None)):
     try:
-        return await payment_handler.delete_line_item(order_id, line_item_id)
+        return await payment_handler.delete_line_item(order_id, line_item_id, merchant_id)
     except Exception as e:
         raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(PAYMENT_ROUTE_ECOMMERCE_KEY)
-async def get_ecommerce_key():
+async def get_ecommerce_key(merchant_id: str = Query(None)):
     try:
-        return await payment_handler.get_ecommerce_key()
+        return await payment_handler.get_ecommerce_key(merchant_id)
     except Exception as e:
         raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.post(PAYMENT_ROUTE_TOKENIZE)
-async def tokenize_card(payload: TokenizeCardRequest):
+async def tokenize_card(payload: TokenizeCardRequest, merchant_id: str = Query(None)):
     try:
-        return await payment_handler.tokenize_card(payload)
+        return await payment_handler.tokenize_card(payload, merchant_id)
     except Exception as e:
         raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.post(PAYMENT_ROUTE_CHARGE)
-async def create_charge(payload: CreateChargeRequest):
+async def create_charge(payload: CreateChargeRequest, merchant_id: str = Query(None)):
     try:
-        return await payment_handler.create_charge(payload)
+        return await payment_handler.create_charge(payload, merchant_id)
     except ValueError as e:
         error_msg = str(e)
         raise HTTPException(status_code=HTTP_STATUS_BAD_REQUEST, detail=error_msg)
@@ -85,9 +81,9 @@ async def create_charge(payload: CreateChargeRequest):
 
 
 @router.get(PAYMENT_ROUTE_TRANSACTIONS)
-async def get_transactions():
+async def get_transactions(merchant_id: str = Query(None)):
     try:
-        return payment_handler.get_transactions()
+        return payment_handler.get_transactions(merchant_id)
     except Exception as e:
         raise HTTPException(status_code=HTTP_STATUS_INTERNAL_SERVER_ERROR, detail=str(e))
 
